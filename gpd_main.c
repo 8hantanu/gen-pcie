@@ -15,6 +15,7 @@ dev_t dev = 0;
 static struct class *dev_class;
 static struct cdev gpd_cdev;
 uint8_t *kernel_buffer;
+struct pci_dev *pci_dev;
 
 static int __init gpd_driver_init(void);
 static void __exit gpd_driver_exit(void);
@@ -34,6 +35,8 @@ static struct file_operations fops =
 
 static int gpd_open(struct inode *inode, struct file *file)
 {
+
+
     /*Creating Physical memory*/
     if((kernel_buffer = kmalloc(mem_size , GFP_KERNEL))) {
         printk(KERN_INFO "Device file opened\n");
