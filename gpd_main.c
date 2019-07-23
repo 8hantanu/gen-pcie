@@ -1,130 +1,90 @@
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/module.h>
-#include <linux/kdev_t.h>
-#include <linux/fs.h>
+#include <linux/stddef.h>
+#include <linux/pci.h>
+#include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/slab.h>         // kmalloc()
-#include <linux/uaccess.h>      // copy_to/from_user()
+#include <linux/aer.h>
 
+#define GPD_LOG(string...) printk(KERN_NOTICE string)
+#define GPD_ERR(string...) printk(KERN_ERR string)
 
-#define mem_size    1024        // kernel buffer size
-
-dev_t dev = 0;
-static struct class *dev_class;
-static struct cdev gpd_cdev;
-uint8_t *kernel_buffer;
-struct pci_dev *pci_dev;
-
-static int __init gpd_driver_init(void);
-static void __exit gpd_driver_exit(void);
-static int gpd_open(struct inode *inode, struct file *file);
-static int gpd_release(struct inode *inode, struct file *file);
-static ssize_t gpd_read(struct file *filp, char __user *buf, size_t len,loff_t * off);
-static ssize_t gpd_write(struct file *filp, const char *buf, size_t len, loff_t * off);
-
-static struct file_operations fops =
-{
-    .owner      = THIS_MODULE,
-    .read       = gpd_read,
-    .write      = gpd_write,
-    .open       = gpd_open,
-    .release    = gpd_release,
-};
-
-static int gpd_open(struct inode *inode, struct file *file)
-{
-
-
-    /*Creating Physical memory*/
-    if((kernel_buffer = kmalloc(mem_size , GFP_KERNEL))) {
-        printk(KERN_INFO "Device file opened\n");
-        return 0;
-    } else {
-        printk(KERN_INFO "Cannot allocate memory in kernel\n");
-        return -1;
-    }
-}
-
-static int gpd_release(struct inode *inode, struct file *file)
-{
-    kfree(kernel_buffer);
-    printk(KERN_INFO "Device file closed\n");
-    return 0;
-}
-
-static ssize_t gpd_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
-{
-    if (copy_to_user(buf, kernel_buffer, mem_size)){
-        printk(KERN_INFO "Data read failed\n");;
-    }
-    printk(KERN_INFO "Data read done\n");
-    return mem_size;
-}
-static ssize_t gpd_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
-{
-    if (copy_from_user(kernel_buffer, buf, len)){
-        printk(KERN_INFO "Data write failed\n");
-    }
-    printk(KERN_INFO "Data write done\n");
-    return len;
-}
-
-static int __init gpd_driver_init(void)
-{
-    /* Allocating Major number */
-    if((alloc_chrdev_region(&dev, 0, 1, "gpd_Dev")) < 0){
-        printk(KERN_INFO "Cannot allocate major number\n");
-        return -1;
-    }
-    printk(KERN_INFO "Major = %d Minor = %d \n",MAJOR(dev), MINOR(dev));
-
-    /* Creating cdev structure */
-    cdev_init(&gpd_cdev,&fops);
-
-    /* Adding character device to the system */
-    if(cdev_add(&gpd_cdev,dev,1) < 0){
-        printk(KERN_INFO "Cannot add the device to the system\n");
-        goto r_class;
-    }
-
-    /* Creating struct class */
-    if((dev_class = class_create(THIS_MODULE,"gpd_class"))){
-        printk(KERN_INFO "Created device struct class\n");
-    } else {
-        printk(KERN_INFO "Cannot create the struct class\n");
-        goto r_class;
-    }
-
-    /* Creating device*/
-    if((device_create(dev_class,NULL,dev,NULL,"gpd_device"))){
-        printk(KERN_INFO "Created device I\n");
-    } else {
-        printk(KERN_INFO "Cannot create the device I\n");
-        goto r_device;
-    }
-    printk(KERN_INFO "Device driver inserted\n");
-    return 0;
-
-r_device:
-    class_destroy(dev_class);
-r_class:
-    unregister_chrdev_region(dev,1);
-    return -1;
-}
-
-void __exit gpd_driver_exit(void)
-{
-    device_destroy(dev_class,dev);
-    class_destroy(dev_class);
-    cdev_del(&gpd_cdev);
-    unregister_chrdev_region(dev, 1);
-    printk(KERN_INFO "Device driver removed\n");
-}
-
-module_init(gpd_driver_init);
-module_exit(gpd_driver_exit);
+#define VENDOR_ID       0x8086
+#define DEVICE_ID       0x270b
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("shantanu.mishra@intel.com");
+
+static const char gpd_name[] = "GenPCIeDriv";
+
+struct pci_dev *pci_dev;
+unsigned long mmio_addr;
+unsigned long reg_len;
+unsigned long *base_addr;
+
+int device_probe(struct pci_dev *dev, const struct pci_device_id *id);
+int device_init(struct pci_dev *dev);
+void device_remove(struct pci_dev *dev);
+
+struct pci_device_id  pci_dev_id_gpd[] = {
+    {VENDOR_ID, DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+    {}
+};
+
+struct pci_driver gen_pcie_driv = {
+    .name = (char *) gpd_name,
+    .id_table = pci_dev_id_gpd,
+    .probe = device_probe,
+    .remove = device_remove
+};
+
+static int __init gpd_init_module(void) {
+    if (pci_register_driver(&gen_pcie_driv))
+        GPD_ERR("Driver register failed");
+    return 0;
+}
+
+static void __exit gpd_exit_module(void) {
+    pci_unregister_driver(&gen_pcie_driv);
+}
+
+int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
+
+    GPD_LOG("Device probed");
+
+    if (pci_enable_device(pdev) != 0 )
+        GPD_ERR("Failed while enabling");
+
+    pci_dev = pci_get_device(VENDOR_ID, DEVICE_ID, NULL);
+    if (pci_dev)
+        GPD_LOG("Device found with vendor ID %d and devive ID %d", VENDOR_ID, DEVICE_ID);
+    else
+        GPD_ERR("Device not found");
+
+    device_init(pci_dev);
+
+    return 0;
+}
+
+int device_init(struct pci_dev *pdev) {
+    if (pci_request_regions(pdev, gpd_name))
+        GPD_ERR("Region map failed");
+
+    pci_set_master(pdev);
+
+    pci_intx(pdev, 0);
+
+	pci_enable_pcie_error_reporting(pdev);
+
+    dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+
+    return 0;
+}
+
+void device_remove(struct pci_dev *dev) {
+    pci_release_regions(dev);
+    pci_disable_device(dev);
+}
+
+module_init(gpd_init_module);
+module_exit(gpd_exit_module);
