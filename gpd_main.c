@@ -1,32 +1,20 @@
 #include "gpd_main.h"
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("shantanu.mishra@intel.com");
 
-static const char gpd_name[] = "GenericPCIeDriver";
 struct pci_dev *pci_dev;
 struct msix_entry *entries;
 unsigned long mmio_addr;
 unsigned long reg_len;
 unsigned long *base_addr;
 
-int device_probe(struct pci_dev *pdev, const struct pci_device_id *id);
-int device_init(struct pci_dev *pdev);
-void device_remove(struct pci_dev *pdev);
-
-struct pci_device_id pci_dev_id_gpd[] = {
-    {VENDOR_ID, DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-    {}
-};
-
-struct pci_driver gen_pcie_driv = {
-    .name = (char *) gpd_name,
-    .id_table = pci_dev_id_gpd,
-    .probe = device_probe,
-    .remove = device_remove
-};
+static void pcie_mask_uerr(struct pci_dev *dev);
+static int pcie_flr(struct pci_dev *dev);
 
 
 static int __init gpd_init_module(void) {
+    // Calls the probe function and registers all devices
     if (pci_register_driver(&gen_pcie_driv))
         GPD_ERR("Driver register failed");
     return 0;
@@ -39,9 +27,11 @@ static void __exit gpd_exit_module(void) {
 
 
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
+
     if (pci_enable_device(pdev) != 0 )
         GPD_ERR("Failed while enabling");
 
+    // Find the device using Device and Vendor ID
     pci_dev = pci_get_device(VENDOR_ID, DEVICE_ID, NULL);
     if (pci_dev) {
         GPD_LOG("Device found");
@@ -56,6 +46,11 @@ int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
 int device_init(struct pci_dev *pdev) {
 
+    // Initiate function level reset if available
+    pcie_flr(pdev);
+    GPD_LOG("Initiated FLR");
+
+    // Request region addressed by the BARs
     if (pci_request_regions(pdev, gpd_name))
         GPD_ERR("Region map failed");
     else
@@ -75,12 +70,7 @@ int device_init(struct pci_dev *pdev) {
         GPD_LOG("Enabled MSI-X vectors");
 
     // UEMsk
-    u32 mask;
-    // Request address for Advanced Error Reporting capability
-	int pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ERR);
-	pci_read_config_dword(pdev, pos + PCI_ERR_UNCOR_MASK, &mask);
-	mask |= PCI_ERR_UNC_UNSUP;
-	pci_write_config_dword(pdev, pos + PCI_ERR_UNCOR_MASK, mask);
+    pcie_mask_uerr(pdev);
 
     // Enable AER capability
 	if (pci_enable_pcie_error_reporting(pdev))
@@ -88,8 +78,11 @@ int device_init(struct pci_dev *pdev) {
     else
         GPD_LOG("Enabled AER");
 
-    // not recomm
+    // Set device power state to D3
     pci_set_power_state(pdev, PCI_D3hot);
+
+    // Cleans up uncorrectable error status registers
+    // pci_cleanup_aer_uncorrect_error_status(pdev);
 
     return 0;
 }
@@ -106,6 +99,39 @@ void device_remove(struct pci_dev *pdev) {
     pci_disable_device(pdev);
     GPD_LOG("Disabled device");
 }
+
+
+
+static void pcie_mask_uerr(struct pci_dev *dev) {
+
+    u32 mask;
+
+	int pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
+
+	pci_read_config_dword(dev, pos + PCI_ERR_UNCOR_MASK, &mask);
+
+	mask |= PCI_ERR_UNC_UNSUP;
+
+	pci_write_config_dword(dev, pos + PCI_ERR_UNCOR_MASK, mask);
+}
+
+
+static int pcie_flr(struct pci_dev *dev) {
+
+	u32 cap;
+
+	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
+	if (!(cap & PCI_EXP_DEVCAP_FLR))
+		return -ENOTTY;
+
+	if (!pci_wait_for_pending_transaction(dev))
+		dev_err(&dev->dev, "timed out waiting for pending transaction; performing function level reset anyway\n");
+
+	pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_BCR_FLR);
+	// usleep(100e3);
+	return 0;
+}
+
 
 module_init(gpd_init_module);
 module_exit(gpd_exit_module);
