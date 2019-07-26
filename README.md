@@ -31,6 +31,8 @@ To view the capabilities enabled by the device driver do:
 $ lspci -d <VENDOR_ID:DEVICE_ID> -vvv
 ```
 
+**Note**: In our case VENDOR_ID is 8086, DEVICE_ID is 270b
+
 To view kernel logs specific to GPD do:
 
 ```bash
