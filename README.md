@@ -4,7 +4,7 @@ Generic PCIe device driver
 
 The GPD(generic PCIe driver) enables all the basic capabilities of any PCIe supported device.
 
-**Note:** Define the `VENDOR_ID` and `DEVICE_ID` of the device to be enabled in `gpd_main.h` file.
+**Note:** Define the `VENDOR_ID` and `DEVICE_ID` of the device to be enabled in `gpd_config.h` file.
 
 ## Build
 
@@ -19,7 +19,7 @@ $ make
 To load the GPD dricer do:
 
 ```bash
-$ insmod gpd_main.ko
+$ insmod gpd.ko
 ```
 
 
@@ -42,5 +42,5 @@ $ dmesg | grep GPD
 To unload the driver do:
 
 ```bash
-$ rmmod gpd_main
+$ rmmod gpd
 ```
