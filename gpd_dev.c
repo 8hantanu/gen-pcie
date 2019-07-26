@@ -28,6 +28,12 @@ int device_init(struct pci_dev *pdev) {
     // pcie_flr(pdev);
     // GPD_LOG("Initiated FLR");
 
+    // Reset device before init capabilities
+    if (pcie_device_reset(pdev, true))
+        GPD_ERR("Function reset failed");
+    else
+        GPD_LOG("Reset function");
+
     // Request region addressed by the BARs
     if (pci_request_regions(pdev, gpd_name))
         GPD_ERR("Region map failed");

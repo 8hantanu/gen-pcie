@@ -1,5 +1,5 @@
-#ifndef GPD_MAIN_H
-#define GPD_MAIN_H
+#ifndef GPD_UTIL_H
+#define GPD_UTIL_H
 
 #include <linux/kernel.h>
 #include <linux/module.h>
