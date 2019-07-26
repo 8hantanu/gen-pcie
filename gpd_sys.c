@@ -61,7 +61,7 @@ int pcie_device_reset(struct pci_dev *pdev, bool save_state) {
             return ret;
     }
 
-    ret = pci_reset_function(pdev);
+    ret = __pci_reset_function_locked(pdev);
     if (ret)
         return ret;
 
