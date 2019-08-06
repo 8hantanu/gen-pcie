@@ -10,6 +10,8 @@
 #include <linux/device.h>
 #include <linux/aer.h>
 
+// TODO: Replace ret with errcodes from <linux/errno.h>
+
 #include "gpd_config.h"
 
 #define GPD_LOG(string...) printk(KERN_NOTICE "GPD: %s", string)

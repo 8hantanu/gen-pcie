@@ -1,6 +1,9 @@
 obj-m := gpd.o
 gpd-objs := gpd_main.o gpd_sys.o gpd_dev.o
 
+# export KSRC=/tools/AGRreleases/yocto/rocko/snr_delivery15.1/axxia-snr-frio-4.12/tools/sysroots/core2-64-intelaxxia-linux/usr/src/kernel
+# export KSRC=/tools/AGRtools/fedora24/4.8.6-201.frio.fc24.x86_64
+
 KSRC ?= /lib/modules/$(shell uname -r)
 
 default:
