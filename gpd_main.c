@@ -13,6 +13,7 @@ struct pci_driver gen_pcie_driv = {
     .name = (char *) gpd_name,
     .id_table = pci_dev_id_gpd,
     .probe = device_probe,
+	.sriov_configure = device_sriov_configure,
     .remove = device_remove
 };
 

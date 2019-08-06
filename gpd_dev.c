@@ -1,5 +1,6 @@
 #include "gpd_dev.h"
 #include "gpd_sys.h"
+#include "gpd_sriov.h"
 
 struct pci_dev *pci_dev;
 struct msix_entry *entries;
@@ -29,6 +30,9 @@ int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
 int device_init(struct pci_dev *pdev) {
 
+    // TEST
+    // device_sriov_configure(pdev, 2);
+
     // Enable bus mastering
     pci_set_master(pdev);
     GPD_LOG("Enabled bus mastering");
@@ -51,16 +55,16 @@ int device_init(struct pci_dev *pdev) {
     else
         GPD_LOG("Enabled MSI-X vectors");
 
-    pci_alloc_irq_vectors(pdev,
-				    HQM_PF_NUM_COMPRESSED_MODE_VECTORS,
-				    HQM_PF_NUM_COMPRESSED_MODE_VECTORS,
-				    PCI_IRQ_MSIX);
+    //pci_alloc_irq_vectors(pdev,
+    //                      HQM_PF_NUM_COMPRESSED_MODE_VECTORS,
+    //                      HQM_PF_NUM_COMPRESSED_MODE_VECTORS,
+    //                      PCI_IRQ_MSIX);
 
     // UEMsk
     pcie_mask_uerr(pdev);
 
     // Enable AER capability
-	if (pci_enable_pcie_error_reporting(pdev))
+    if (pci_enable_pcie_error_reporting(pdev))
         GPD_ERR("AER enable failed");
     else
         GPD_LOG("Enabled AER");
@@ -72,6 +76,14 @@ int device_init(struct pci_dev *pdev) {
     // pci_cleanup_aer_uncorrect_error_status(pdev);
 
     return 0;
+}
+
+
+int device_sriov_configure(struct pci_dev *pdev, int num_vfs) {
+    if (num_vfs)
+        return device_sriov_enable(pdev, num_vfs);
+    else
+        return device_sriov_disable(pdev, num_vfs);
 }
 
 
