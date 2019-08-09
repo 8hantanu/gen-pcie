@@ -66,6 +66,24 @@ int device_init(struct pci_dev *pdev) {
     else
         GPD_LOG("Enabled AER");
 
+    // BAR iomap
+    if (pci_iomap(pdev, 0, 0)) {
+        GPD_LOG("Mapped BAR 0 space");
+        printk(KERN_NOTICE "GPD: BAR 0 start at 0x%llx\n", pci_resource_start(pdev, 0));
+        printk(KERN_NOTICE "GPD: BAR 0 len is %llu\n", pci_resource_len(pdev, 0));
+    } else {
+        GPD_ERR("Failed to map BAR 0");
+        // TODO: Add fail flow
+    }
+    if (pci_iomap(pdev, 2, 0)) {
+        GPD_LOG("Mapped BAR 2 space");
+        printk(KERN_NOTICE "GPD: BAR 2 start at 0x%llx\n", pci_resource_start(pdev, 2));
+        printk(KERN_NOTICE "GPD: BAR 2 len is %llu\n", pci_resource_len(pdev, 2));
+    } else {
+        GPD_ERR("Failed to map BAR 2");
+        // TODO: Add fail flow
+    }
+
     // Set device power state to D3
     pci_set_power_state(pdev, PCI_D3hot);
 
