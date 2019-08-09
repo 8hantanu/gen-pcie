@@ -50,15 +50,12 @@ int device_init(struct pci_dev *pdev) {
     pci_intx(pdev, 0);
 
     // Enable MSI-X vectors
-    if (pci_msix_vec_count(pdev) != pci_enable_msix_range(pdev, entries, 1, pci_msix_vec_count(pdev)))
-        GPD_ERR("MSI-X vectors enable failed");
-    else
-        GPD_LOG("Enabled MSI-X vectors");
+    // if (pci_msix_vec_count(pdev) != pci_enable_msix_range(pdev, entries, 1, pci_msix_vec_count(pdev)))
+    //     GPD_ERR("MSI-X vectors enable failed");
+    // else
+    //     GPD_LOG("Enabled MSI-X vectors");
 
-    //pci_alloc_irq_vectors(pdev,
-    //                      HQM_PF_NUM_COMPRESSED_MODE_VECTORS,
-    //                      HQM_PF_NUM_COMPRESSED_MODE_VECTORS,
-    //                      PCI_IRQ_MSIX);
+    pci_alloc_irq_vectors(pdev, 2, 2, PCI_IRQ_MSIX);
 
     // UEMsk
     pcie_mask_uerr(pdev);

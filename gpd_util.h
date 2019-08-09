@@ -17,6 +17,6 @@
 #define GPD_LOG(string...) printk(KERN_NOTICE "GPD: %s", string)
 #define GPD_ERR(string...) printk(KERN_ERR "GPD: %s", string)
 
-static const char gpd_name[] = "GenericPCIeDriver";
+static const char gpd_name[] = "hqm";
 
 #endif
