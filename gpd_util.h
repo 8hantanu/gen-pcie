@@ -9,6 +9,8 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/aer.h>
+#include <linux/fs.h>
+#include <linux/version.h>
 
 // TODO: Replace ret with errcodes from <linux/errno.h>
 

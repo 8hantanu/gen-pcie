@@ -5,10 +5,33 @@
 struct pci_dev *pci_dev;
 struct msix_entry *entries;
 
+struct file_operations gpd_fops = {
+	.owner   = THIS_MODULE,
+//	.open    = gpd_open,
+//	.release = gpd_close,
+///	.read    = gpd_read,
+	.write   = gpd_write,
+//	.mmap    = gpd_mmap,
+#if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
+//	.unlocked_ioctl = gpd_ioctl,
+#else
+//	.ioctl   = gpd_ioctl,
+#endif
+
+};
+
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
-    if (pci_enable_device(pdev) != 0 )
-        GPD_ERR("Failed while enabling");
+    struct gpd_dev *gpd_dev;
+	int ret;
+	gpd_dev = devm_kcalloc(&pdev->dev, 1, sizeof(struct gpd_dev), GFP_KERNEL);
+	if (!gpd_dev) {
+		ret = -ENOMEM;
+	}
+
+    pci_set_drvdata(pdev, gpd_dev);
+
+	gpd_dev->pdev = pdev;
 
     // Find the device using Device and Vendor ID
     pci_dev = pci_get_device(VENDOR_ID, DEVICE_ID, NULL);
@@ -19,7 +42,7 @@ int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
             GPD_ERR("Function reset failed");
         else
             GPD_LOG("Reset device");
-        device_init(pci_dev);
+        device_init(gpd_dev, pci_dev);
     } else {
         GPD_ERR("Device not found");
     }
@@ -28,7 +51,11 @@ int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 }
 
 
-int device_init(struct pci_dev *pdev) {
+
+int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
+
+    if (pci_enable_device(pdev) != 0 )
+        GPD_ERR("Failed while enabling");
 
     // TEST
     // device_sriov_configure(pdev, 2);
@@ -50,10 +77,10 @@ int device_init(struct pci_dev *pdev) {
     pci_intx(pdev, 0);
 
     // Enable MSI-X vectors
-    // if (pci_msix_vec_count(pdev) != pci_enable_msix_range(pdev, entries, 1, pci_msix_vec_count(pdev)))
-    //     GPD_ERR("MSI-X vectors enable failed");
-    // else
-    //     GPD_LOG("Enabled MSI-X vectors");
+    if (pci_msix_vec_count(pdev) != pci_enable_msix_range(pdev, entries, 1, pci_msix_vec_count(pdev)))
+        GPD_ERR("MSI-X vectors enable failed");
+    else
+        GPD_LOG("Enabled MSI-X vectors");
 
     pci_alloc_irq_vectors(pdev, 2, 2, PCI_IRQ_MSIX);
 
@@ -67,22 +94,32 @@ int device_init(struct pci_dev *pdev) {
         GPD_LOG("Enabled AER");
 
     // BAR iomap
-    if (pci_iomap(pdev, 0, 0)) {
+	gpd_dev->hw.csr_kva = pci_iomap(pdev, 0, 0);
+	gpd_dev->hw.csr_phys_addr = pci_resource_start(pdev, 0);
+	if (!gpd_dev->hw.csr_kva) {
+        GPD_ERR("Failed to map BAR 0");
+        // TODO: Add fail flow
+    } else {
         GPD_LOG("Mapped BAR 0 space");
         printk(KERN_NOTICE "GPD: BAR 0 start at 0x%llx\n", pci_resource_start(pdev, 0));
         printk(KERN_NOTICE "GPD: BAR 0 len is %llu\n", pci_resource_len(pdev, 0));
-    } else {
-        GPD_ERR("Failed to map BAR 0");
-        // TODO: Add fail flow
     }
-    if (pci_iomap(pdev, 2, 0)) {
+	gpd_dev->hw.func_kva = pci_iomap(pdev, 2, 0);
+	gpd_dev->hw.func_phys_addr = pci_resource_start(pdev, 2);
+    if (!gpd_dev->hw.func_kva) {
+        GPD_ERR("Failed to map BAR 2");
+        // TODO: Add fail flow
+    } else {
         GPD_LOG("Mapped BAR 2 space");
         printk(KERN_NOTICE "GPD: BAR 2 start at 0x%llx\n", pci_resource_start(pdev, 2));
         printk(KERN_NOTICE "GPD: BAR 2 len is %llu\n", pci_resource_len(pdev, 2));
-    } else {
-        GPD_ERR("Failed to map BAR 2");
-        // TODO: Add fail flow
     }
+
+    // Add cdev
+    device_cdev_add(gpd_dev, gpd_dev_num, &gpd_fops);
+
+    // Create cdev
+    device_pf_create(gpd_dev, pdev, dev_class);
 
     // Set device power state to D3
     pci_set_power_state(pdev, PCI_D3hot);
@@ -91,6 +128,52 @@ int device_init(struct pci_dev *pdev) {
     // pci_cleanup_aer_uncorrect_error_status(pdev);
 
     return 0;
+}
+
+
+int device_cdev_add(struct gpd_dev *gpd_dev,
+		    dev_t base,
+		    const struct file_operations *fops)
+{
+	int ret;
+
+	gpd_dev->dev_number = MKDEV(MAJOR(base), MINOR(base) + (gpd_dev->id * NUM_DEV_FILES_PER_DEVICE));
+
+	cdev_init(&gpd_dev->cdev, fops);
+
+	gpd_dev->cdev.dev   = gpd_dev->dev_number;
+	gpd_dev->cdev.owner = THIS_MODULE;
+
+	ret = cdev_add(&gpd_dev->cdev,
+		       gpd_dev->cdev.dev,
+		       NUM_DEV_FILES_PER_DEVICE);
+
+    if (ret < 0)
+	   GPD_ERR("Add cdev failed");
+
+	return ret;
+}
+
+
+int device_pf_create(struct gpd_dev *gpd_dev,
+			 struct pci_dev *pdev,
+			 struct class *dev_class)
+{
+	dev_t dev;
+
+	dev = MKDEV(MAJOR(gpd_dev->dev_number), MINOR(gpd_dev->dev_number) + MAX_NUM_DOMAINS);
+
+	/* Create a new device in order to create a /dev/ gpd node. This device
+	 * is a child of the HQM PCI device.
+	 */
+	gpd_dev->gpd_device = device_create(dev_class,
+					    &pdev->dev,
+					    dev,
+					    gpd_dev,
+					    "gpd%d/gpd",
+					    gpd_dev->id);
+
+	return 0;
 }
 
 
