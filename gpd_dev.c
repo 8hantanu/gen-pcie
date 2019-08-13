@@ -122,10 +122,10 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     device_pf_create(gpd_dev, pdev, dev_class);
 
     // Set device power state to D3
-    pci_set_power_state(pdev, PCI_D3hot);
+    // pci_set_power_state(pdev, PCI_D3hot);
 
     // Cleans up uncorrectable error status registers
-    // pci_cleanup_aer_uncorrect_error_status(pdev);
+    pci_cleanup_aer_uncorrect_error_status(pdev);
 
     return 0;
 }
