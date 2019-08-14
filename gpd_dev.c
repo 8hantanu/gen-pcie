@@ -76,13 +76,17 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     // Enable PCI INTx
     pci_intx(pdev, 0);
 
-    // Enable MSI-X vectors
-    if (pci_msix_vec_count(pdev) != pci_enable_msix_range(pdev, entries, 1, pci_msix_vec_count(pdev)))
+    // Enable interrupt vectors
+	int vecs_available = pci_msix_vec_count(pdev);
+	int vecs_assigned = pci_enable_msix_range(pdev, entries, 1, vecs_available);
+    if (vecs_available != vecs_assigned)
         GPD_ERR("MSI-X vectors enable failed");
     else
         GPD_LOG("Enabled MSI-X vectors");
+	printk(KERN_NOTICE "GPD: Total %d MSI vecs available", vecs_available);
+	printk(KERN_NOTICE "GPD: Total %d MSI vecs assigned", vecs_assigned);
 
-    pci_alloc_irq_vectors(pdev, 2, 2, PCI_IRQ_MSIX);
+    pci_alloc_irq_vectors(pdev, 9, 9, PCI_IRQ_MSIX);
 
     // UEMsk
     pcie_mask_uerr(pdev);
@@ -186,6 +190,12 @@ int device_sriov_configure(struct pci_dev *pdev, int num_vfs) {
 
 
 void device_remove(struct pci_dev *pdev) {
+
+	pci_free_irq_vectors(pdev);
+    GPD_LOG("Released IRQ vectors");
+
+	pci_disable_msix(pdev);
+	GPD_LOG("Released MSI-X vectors");
 
     pci_disable_pcie_error_reporting(pdev);
     GPD_LOG("Disabled AER");
