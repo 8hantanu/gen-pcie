@@ -13,12 +13,17 @@ struct file_operations gpd_fops = {
     .write   = gpd_write,
 //  .mmap    = gpd_mmap,
 #if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
-//    .unlocked_ioctl = gpd_ioctl,
+//  .unlocked_ioctl = gpd_ioctl,
 #else
-//    .ioctl   = gpd_ioctl,
+//  .ioctl   = gpd_ioctl,
 #endif
-
 };
+
+dma_addr_t pc_dma_base = 0;
+dma_addr_t q_dma_base = 0;
+
+void *pc_base = NULL;
+void *q_base = NULL;
 
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
@@ -128,6 +133,9 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     // Set device power state to D3
     // pci_set_power_state(pdev, PCI_D3hot);
 
+    // Allocate DMA coherent
+    device_alloc_dma_coherent(gpd_dev);
+
     // Cleans up uncorrectable error status registers
     pci_cleanup_aer_uncorrect_error_status(pdev);
 
@@ -168,14 +176,37 @@ int device_pf_create(struct gpd_dev *gpd_dev,
     dev = MKDEV(MAJOR(gpd_dev->dev_number), MINOR(gpd_dev->dev_number) + MAX_NUM_DOMAINS);
 
     /* Create a new device in order to create a /dev/ gpd node. This device
-     * is a child of the HQM PCI device.
+     * is a child of the PCI device.
      */
-    gpd_dev->gpd_device = device_create(dev_class,
-                        &pdev->dev,
-                        dev,
-                        gpd_dev,
-                        "gpd%d/gpd",
-                        gpd_dev->id);
+    gpd_dev->gpd_device = device_create(dev_class, &pdev->dev,
+                                        dev, gpd_dev,
+                                        "gpd%d/gpd", gpd_dev->id);
+
+    return 0;
+}
+
+
+int device_alloc_dma_coherent(struct gpd_dev *gpd_dev){
+
+    // dma alloc limit seems to be 4MB
+    q_base = dma_alloc_coherent(&gpd_dev->pdev->dev,
+                                NUM_DIR_QS*NUM_Q_ITEMS*ITEM_SIZE,
+                                &q_dma_base,
+                                GFP_KERNEL);
+
+    if (!q_base) {
+        GPD_ERR("Unable to allocate coherent DMA");
+        if (q_dma_base)
+            dma_free_coherent(&gpd_dev->pdev->dev,
+                              NUM_DIR_QS*NUM_Q_ITEMS*ITEM_SIZE,
+                              q_base,
+                              q_dma_base);
+        return -ENOMEM;
+    } else {
+        GPD_LOG("Allocated coherent DMA");
+        printk(KERN_NOTICE "GPD: Queue PA: 0x%llx\n", virt_to_phys(q_base));
+        printk(KERN_NOTICE "GPD: Queue IOVA: 0x%llx\n", q_dma_base);
+    }
 
     return 0;
 }
@@ -200,21 +231,18 @@ void device_remove(struct pci_dev *pdev) {
     pci_disable_msix(pdev);
     GPD_LOG("Released MSI-X vectors");
 
-	device_destroy(dev_class, MKDEV(MAJOR(gpd_dev->dev_number),
-			     MINOR(gpd_dev->dev_number) +
-				MAX_NUM_DOMAINS));
-	cdev_del(&gpd_dev->cdev);
-	GPD_LOG("Deleted char dev");
-
-	class_destroy(dev_class);
-	GPD_LOG("Destroyed dev_class");
-
-	pci_iounmap(pdev, gpd_dev->hw.csr_kva);
-	pci_iounmap(pdev, gpd_dev->hw.func_kva);
-	GPD_LOG("Unmapped BARs");
+    pci_iounmap(pdev, gpd_dev->hw.csr_kva);
+    pci_iounmap(pdev, gpd_dev->hw.func_kva);
+    GPD_LOG("Unmapped BARs");
 
     pci_disable_pcie_error_reporting(pdev);
     GPD_LOG("Disabled AER");
+
+    dma_free_coherent(&gpd_dev->pdev->dev,
+                      NUM_DIR_QS*NUM_Q_ITEMS*ITEM_SIZE,
+                      q_base,
+                      q_dma_base);
+    GPD_LOG("Released DMA coherent");
 
     pci_release_regions(pdev);
     GPD_LOG("Released MMIO/IOP regions");
@@ -224,4 +252,16 @@ void device_remove(struct pci_dev *pdev) {
 
     pci_disable_device(pdev);
     GPD_LOG("Disabled device");
+
+    // FIXME: dev_class not being deleted on driver remove
+    device_destroy(dev_class, MKDEV(MAJOR(gpd_dev->dev_number),
+                 MINOR(gpd_dev->dev_number) + MAX_NUM_DOMAINS));
+    class_destroy(dev_class);
+    GPD_LOG("Destroyed dev_class");
+
+    cdev_del(&gpd_dev->cdev);
+    GPD_LOG("Deleted char dev");
+
+    unregister_chrdev_region(gpd_dev_num, 1);
+    GPD_LOG("Unregister Major Minor number");
 }

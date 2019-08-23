@@ -34,6 +34,7 @@ static int __init gpd_init_module(void) {
 }
 
 static void __exit gpd_exit_module(void) {
+    // Calls the remove function on gen_pcie_driv
     pci_unregister_driver(&gen_pcie_driv);
 }
 
