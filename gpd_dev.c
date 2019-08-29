@@ -12,18 +12,19 @@ struct file_operations gpd_fops = {
 //  .read    = gpd_read,
     .write   = gpd_write,
 //  .mmap    = gpd_mmap,
-#if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
+// #if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
 //  .unlocked_ioctl = gpd_ioctl,
-#else
+// #else
 //  .ioctl   = gpd_ioctl,
-#endif
+// #endif
 };
 
-dma_addr_t pc_dma_base = 0;
-dma_addr_t q_dma_base = 0;
+int i;
 
-void *pc_base = NULL;
-void *q_base = NULL;
+dev_t gpd_dev_num;
+struct class *dev_class;
+
+struct q_head q_heads[NUM_DIR_QS];
 
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
@@ -186,24 +187,26 @@ int device_pf_create(struct gpd_dev *gpd_dev,
 
 int device_alloc_dma_coherent(struct gpd_dev *gpd_dev){
 
-    // dma alloc limit seems to be 4MB
-    q_base = dma_alloc_coherent(&gpd_dev->pdev->dev,
-                                NUM_DIR_QS*NUM_Q_ITEMS*ITEM_SIZE,
-                                &q_dma_base,
-                                GFP_KERNEL);
+    for (i = 0; i < NUM_DIR_QS; i++) {
+        // dma alloc limit seems to be 4MB
+        q_heads[i].base = dma_alloc_coherent(&gpd_dev->pdev->dev,
+                                             PAGE_SIZE,
+                                             &q_heads[i].dma_base,
+                                             GFP_KERNEL);
 
-    if (!q_base) {
-        GPD_ERR("Unable to allocate coherent DMA");
-        if (q_dma_base)
-            dma_free_coherent(&gpd_dev->pdev->dev,
-                              NUM_DIR_QS*NUM_Q_ITEMS*ITEM_SIZE,
-                              q_base,
-                              q_dma_base);
-        return -ENOMEM;
-    } else {
-        GPD_LOG("Allocated coherent DMA");
-        printk(KERN_NOTICE "GPD: Queue PA: 0x%llx\n", virt_to_phys(q_base));
-        printk(KERN_NOTICE "GPD: Queue IOVA: 0x%llx\n", q_dma_base);
+        if (!q_heads[i].base) {
+            printk(KERN_ERR "Unable to allocate coherent DMA to queue %d\n", i);
+            if (q_heads[i].dma_base)
+                dma_free_coherent(&gpd_dev->pdev->dev,
+                                  PAGE_SIZE,
+                                  q_heads[i].base,
+                                  q_heads[i].dma_base);
+            return -ENOMEM;
+        } else {
+            printk(KERN_NOTICE "Allocate coherent DMA to queue %d\n", i);
+            printk(KERN_NOTICE "GPD: Queue PA: 0x%llx\n", virt_to_phys(q_heads[i].base));
+            printk(KERN_NOTICE "GPD: Queue IOVA: 0x%llx\n", q_heads[i].dma_base);
+        }
     }
 
     return 0;
@@ -236,10 +239,8 @@ void device_remove(struct pci_dev *pdev) {
     pci_disable_pcie_error_reporting(pdev);
     GPD_LOG("Disabled AER");
 
-    dma_free_coherent(&gpd_dev->pdev->dev,
-                      NUM_DIR_QS*NUM_Q_ITEMS*ITEM_SIZE,
-                      q_base,
-                      q_dma_base);
+    for(i = 0; i < NUM_DIR_QS; i++)
+        dma_free_coherent(&gpd_dev->pdev->dev, PAGE_SIZE, q_heads[i].base, q_heads[i].dma_base);
     GPD_LOG("Released DMA coherent");
 
     pci_release_regions(pdev);
