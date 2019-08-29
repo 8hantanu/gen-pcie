@@ -28,33 +28,23 @@ void *q_base = NULL;
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
     struct gpd_dev *gpd_dev;
-    int ret;
     gpd_dev = devm_kcalloc(&pdev->dev, 1, sizeof(struct gpd_dev), GFP_KERNEL);
-    if (!gpd_dev) {
-        ret = -ENOMEM;
-    }
+    if (!gpd_dev)
+        return -ENOMEM;
 
     pci_set_drvdata(pdev, gpd_dev);
 
     gpd_dev->pdev = pdev;
 
-    // Find the device using Device and Vendor ID
-    pci_dev = pci_get_device(VENDOR_ID, DEVICE_ID, NULL);
-    if (pci_dev) {
-        GPD_LOG("Device found");
-        // Reset device before init caps
-        if (pcie_device_reset(pci_dev, true))
-            GPD_ERR("Function reset failed");
-        else
-            GPD_LOG("Reset device");
-        device_init(gpd_dev, pci_dev);
-    } else {
-        GPD_ERR("Device not found");
-    }
+    if (pcie_device_reset(pdev, true))
+        GPD_ERR("Function reset failed");
+    else
+        GPD_LOG("Device Reset");
+
+    device_init(gpd_dev, pdev);
 
     return 0;
 }
-
 
 
 int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
@@ -62,12 +52,8 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     if (pci_enable_device(pdev) != 0 )
         GPD_ERR("Failed while enabling");
 
-    // TEST
+    // VFs
     // device_sriov_configure(pdev, 2);
-
-    // Enable bus mastering
-    pci_set_master(pdev);
-    GPD_LOG("Enabled bus mastering");
 
     // Request regions addressed by the BARs
     if (pci_request_regions(pdev, gpd_name))
@@ -75,26 +61,12 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     else
         GPD_LOG("Mapped MMIO/IOP regions");
 
-    // Set DMA Mask
-    dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+    // Enable bus mastering
+    pci_set_master(pdev);
+    GPD_LOG("Enabled bus mastering");
 
     // Enable PCI INTx
     pci_intx(pdev, 0);
-
-    // Enable interrupt vectors
-    int vecs_available = pci_msix_vec_count(pdev);
-    int vecs_assigned = pci_enable_msix_range(pdev, entries, 1, vecs_available);
-    if (vecs_available != vecs_assigned)
-        GPD_ERR("MSI-X vectors enable failed");
-    else
-        GPD_LOG("Enabled MSI-X vectors");
-    printk(KERN_NOTICE "GPD: Total %d MSI vecs available", vecs_available);
-    printk(KERN_NOTICE "GPD: Total %d MSI vecs assigned", vecs_assigned);
-
-    pci_alloc_irq_vectors(pdev, 9, 9, PCI_IRQ_MSIX);
-
-    // UEMsk
-    pcie_mask_uerr(pdev);
 
     // Enable AER capability
     if (pci_enable_pcie_error_reporting(pdev))
@@ -102,7 +74,48 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     else
         GPD_LOG("Enabled AER");
 
+    // Set DMA Mask
+    dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+
+    // Enable interrupt vectors
+    // int vecs_available = pci_msix_vec_count(pdev);
+    // int vecs_assigned = pci_enable_msix_range(pdev, entries, 1, vecs_available);
+    // if (vecs_available != vecs_assigned)
+    //     GPD_ERR("MSI-X vectors enable failed");
+    // else
+    //     GPD_LOG("Enabled MSI-X vectors");
+    // printk(KERN_NOTICE "GPD: Total %d MSI vecs available", vecs_available);
+    // printk(KERN_NOTICE "GPD: Total %d MSI vecs assigned", vecs_assigned);
+    //
+    // pci_alloc_irq_vectors(pdev, 9, 9, PCI_IRQ_MSIX);
+
+    // UEMsk
+    pcie_mask_uerr(pdev);
+
     // BAR iomap
+    device_map_bar_space(gpd_dev, pdev);
+
+    // Add cdev
+    device_cdev_add(gpd_dev, gpd_dev_num, &gpd_fops);
+
+    // Create cdev
+    device_pf_create(gpd_dev, pdev, dev_class);
+
+    // Set device power state to D3
+    // pci_set_power_state(pdev, PCI_D3hot);
+
+    // Allocate DMA coherent
+    device_alloc_dma_coherent(gpd_dev);
+
+    // Cleans up uncorrectable error status registers
+    pci_cleanup_aer_uncorrect_error_status(pdev);
+
+    return 0;
+}
+
+
+int device_map_bar_space(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
+
     gpd_dev->hw.csr_kva = pci_iomap(pdev, 0, 0);
     gpd_dev->hw.csr_phys_addr = pci_resource_start(pdev, 0);
     if (!gpd_dev->hw.csr_kva) {
@@ -124,21 +137,6 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
         printk(KERN_NOTICE "GPD: BAR 2 len is %llu\n", pci_resource_len(pdev, 2));
     }
 
-    // Add cdev
-    device_cdev_add(gpd_dev, gpd_dev_num, &gpd_fops);
-
-    // Create cdev
-    device_pf_create(gpd_dev, pdev, dev_class);
-
-    // Set device power state to D3
-    // pci_set_power_state(pdev, PCI_D3hot);
-
-    // Allocate DMA coherent
-    device_alloc_dma_coherent(gpd_dev);
-
-    // Cleans up uncorrectable error status registers
-    pci_cleanup_aer_uncorrect_error_status(pdev);
-
     return 0;
 }
 
@@ -149,7 +147,7 @@ int device_cdev_add(struct gpd_dev *gpd_dev,
 {
     int ret;
 
-    gpd_dev->dev_number = MKDEV(MAJOR(base), MINOR(base) + (gpd_dev->id * NUM_DEV_FILES_PER_DEVICE));
+    gpd_dev->dev_number = MKDEV(MAJOR(base), MINOR(base));// + (gpd_dev->id * NUM_DEV_FILES_PER_DEVICE));
 
     cdev_init(&gpd_dev->cdev, fops);
 
@@ -173,7 +171,7 @@ int device_pf_create(struct gpd_dev *gpd_dev,
 {
     dev_t dev;
 
-    dev = MKDEV(MAJOR(gpd_dev->dev_number), MINOR(gpd_dev->dev_number) + MAX_NUM_DOMAINS);
+    dev = MKDEV(MAJOR(gpd_dev->dev_number), MINOR(gpd_dev->dev_number));// + MAX_NUM_DOMAINS);
 
     /* Create a new device in order to create a /dev/ gpd node. This device
      * is a child of the PCI device.
@@ -255,7 +253,7 @@ void device_remove(struct pci_dev *pdev) {
 
     // FIXME: dev_class not being deleted on driver remove
     device_destroy(dev_class, MKDEV(MAJOR(gpd_dev->dev_number),
-                 MINOR(gpd_dev->dev_number) + MAX_NUM_DOMAINS));
+                 MINOR(gpd_dev->dev_number)));// + MAX_NUM_DOMAINS));
     class_destroy(dev_class);
     GPD_LOG("Destroyed dev_class");
 
