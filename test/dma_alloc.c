@@ -12,10 +12,10 @@
 
 int main(int argc, char *argv[]) {
 
-    printf("GPD DMA NON_CONTIG MEM ALLOC TEST\n");
+    printf("GPD DMA NON-CONTIG MEM ALLOC TEST\n");
 
     int fd, i, size;
-    long qid_addr[128];
+    unsigned long qid_addr[128];
     char *ptr;
 
     printf("Opening GPD driver\n");
@@ -39,8 +39,8 @@ int main(int argc, char *argv[]) {
 
     for(i = 0; i < size; i++) {
         qid_addr[i] = i;
-        ioctl(fd, GET_Q_HEAD, (int*) &qid_addr[i]);
-        printf("QID %d head pointer: 0x%ld\n", i, qid_addr[i]);
+        ioctl(fd, GET_Q_HEAD, (long*) &qid_addr[i]);
+        printf("QID %d head pointer: 0x%lx\n", i, qid_addr[i]);
     }
 
     // printf("Unallocating queue memory\n");

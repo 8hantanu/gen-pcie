@@ -175,7 +175,7 @@ int device_pf_create(struct gpd_dev *gpd_dev,
      */
     gpd_dev->gpd_device = device_create(dev_class, &pdev->dev,
                                         dev, gpd_dev,
-                                        "gpd%d/gpd", gpd_dev->id);
+                                        "gpd");
 
     return 0;
 }

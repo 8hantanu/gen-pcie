@@ -42,21 +42,6 @@ void destory_queue_mem(void) {
 
 int get_queue_head(long* arg) {
 
-    int qid;
-    if (copy_from_user(&qid ,(long*) arg, sizeof(qid))) {
-        GPD_ERR("Failed to get QID");
-        return 1; // TODO: change return code
-    }
-
-    if (qid < q_size){
-        if (copy_to_user((long*) arg, &q_heads[i].dma_base, sizeof(q_heads[i].dma_base)))
-            GPD_ERR("Failed to send queue head pointer");
-        else
-            printk(KERN_NOTICE "GPD: Queue head pointer for QID %d is 0x%lx\n", qid, *arg);
-    } else {
-        printk(KERN_ERR "GPD: Invalid QID %d. QID must be less than %d\n", qid, q_size);
-        return 1; // TODO: change return code
-    }
 
     return 0;
 }
