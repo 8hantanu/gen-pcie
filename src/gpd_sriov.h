@@ -172,5 +172,4 @@ int device_sriov_disable(struct pci_dev *pdev, int num_vfs) {
     return 0;
 }
 
-
 #endif
