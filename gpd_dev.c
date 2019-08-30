@@ -24,6 +24,7 @@ int i;
 dev_t gpd_dev_num;
 struct class *dev_class;
 
+dma_addr_t dma_base;
 struct q_head q_heads[NUM_DIR_QS];
 
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
@@ -188,22 +189,26 @@ int device_pf_create(struct gpd_dev *gpd_dev,
 int device_alloc_dma_coherent(struct gpd_dev *gpd_dev){
 
     for (i = 0; i < NUM_DIR_QS; i++) {
+
+        dma_base = 0;
         // dma alloc limit seems to be 4MB
         q_heads[i].base = dma_alloc_coherent(&gpd_dev->pdev->dev,
                                              PAGE_SIZE,
-                                             &q_heads[i].dma_base,
+                                             &dma_base,
                                              GFP_KERNEL);
+
+        q_heads[i].dma_base = (int) dma_base;
 
         if (!q_heads[i].base) {
             printk(KERN_ERR "Unable to allocate coherent DMA to queue %d\n", i);
-            if (q_heads[i].dma_base)
+            if (dma_base)
                 dma_free_coherent(&gpd_dev->pdev->dev,
                                   PAGE_SIZE,
                                   q_heads[i].base,
-                                  q_heads[i].dma_base);
+                                  dma_base);
             return -ENOMEM;
         } else {
-            printk(KERN_NOTICE "Allocate coherent DMA to queue %d\n", i);
+            printk(KERN_NOTICE "GPD: Allocate coherent DMA to queue %d\n", i);
             printk(KERN_NOTICE "GPD: Queue PA: 0x%llx\n", virt_to_phys(q_heads[i].base));
             printk(KERN_NOTICE "GPD: Queue IOVA: 0x%llx\n", q_heads[i].dma_base);
         }

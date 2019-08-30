@@ -6,12 +6,15 @@
 
 struct q_head {
 	void *base;
-	dma_addr_t dma_base;
+	unsigned long long dma_base;
 };
 
 extern dev_t gpd_dev_num;
 extern struct class *dev_class;
+
+extern dma_addr_t dma_base;
 extern struct q_head q_heads[NUM_DIR_QS];
+
 
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev);
