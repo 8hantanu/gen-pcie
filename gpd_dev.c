@@ -10,22 +10,17 @@ struct file_operations gpd_fops = {
 //  .open    = gpd_open,
 //  .release = gpd_close,
 //  .read    = gpd_read,
-    .write   = gpd_write,
+//  .write   = gpd_write,
 //  .mmap    = gpd_mmap,
-// #if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
-//  .unlocked_ioctl = gpd_ioctl,
-// #else
-//  .ioctl   = gpd_ioctl,
-// #endif
+#if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
+    .unlocked_ioctl = gpd_ioctl,
+#else
+    .ioctl   = gpd_ioctl,
+#endif
 };
-
-int i;
 
 dev_t gpd_dev_num;
 struct class *dev_class;
-
-dma_addr_t dma_base;
-struct q_head q_heads[NUM_DIR_QS];
 
 int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
@@ -107,7 +102,7 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     // pci_set_power_state(pdev, PCI_D3hot);
 
     // Allocate DMA coherent
-    device_alloc_dma_coherent(gpd_dev);
+    // device_alloc_dma_coherent(gpd_dev);
 
     // Cleans up uncorrectable error status registers
     pci_cleanup_aer_uncorrect_error_status(pdev);
@@ -186,36 +181,36 @@ int device_pf_create(struct gpd_dev *gpd_dev,
 }
 
 
-int device_alloc_dma_coherent(struct gpd_dev *gpd_dev){
-
-    for (i = 0; i < NUM_DIR_QS; i++) {
-
-        dma_base = 0;
-        // dma alloc limit seems to be 4MB
-        q_heads[i].base = dma_alloc_coherent(&gpd_dev->pdev->dev,
-                                             PAGE_SIZE,
-                                             &dma_base,
-                                             GFP_KERNEL);
-
-        q_heads[i].dma_base = (int) dma_base;
-
-        if (!q_heads[i].base) {
-            printk(KERN_ERR "Unable to allocate coherent DMA to queue %d\n", i);
-            if (dma_base)
-                dma_free_coherent(&gpd_dev->pdev->dev,
-                                  PAGE_SIZE,
-                                  q_heads[i].base,
-                                  dma_base);
-            return -ENOMEM;
-        } else {
-            printk(KERN_NOTICE "GPD: Allocate coherent DMA to queue %d\n", i);
-            printk(KERN_NOTICE "GPD: Queue PA: 0x%llx\n", virt_to_phys(q_heads[i].base));
-            printk(KERN_NOTICE "GPD: Queue IOVA: 0x%llx\n", q_heads[i].dma_base);
-        }
-    }
-
-    return 0;
-}
+// int device_alloc_dma_coherent(struct gpd_dev *gpd_dev){
+//
+//     for (i = 0; i < NUM_DIR_QS; i++) {
+//
+//         dma_base = 0;
+//         // dma alloc limit seems to be 4MB
+//         q_heads[i].base = dma_alloc_coherent(&gpd_dev->pdev->dev,
+//                                              PAGE_SIZE,
+//                                              &dma_base,
+//                                              GFP_KERNEL);
+//
+//         q_heads[i].dma_base = (int) dma_base;
+//
+//         if (!q_heads[i].base) {
+//             printk(KERN_ERR "Unable to allocate coherent DMA to queue %d\n", i);
+//             if (dma_base)
+//                 dma_free_coherent(&gpd_dev->pdev->dev,
+//                                   PAGE_SIZE,
+//                                   q_heads[i].base,
+//                                   dma_base);
+//             return -ENOMEM;
+//         } else {
+//             printk(KERN_NOTICE "GPD: Allocate coherent DMA to queue %d\n", i);
+//             printk(KERN_NOTICE "GPD: Queue PA: 0x%llx\n", virt_to_phys(q_heads[i].base));
+//             printk(KERN_NOTICE "GPD: Queue IOVA: 0x%llx\n", q_heads[i].dma_base);
+//         }
+//     }
+//
+//     return 0;
+// }
 
 
 int device_sriov_configure(struct pci_dev *pdev, int num_vfs) {
@@ -244,9 +239,9 @@ void device_remove(struct pci_dev *pdev) {
     pci_disable_pcie_error_reporting(pdev);
     GPD_LOG("Disabled AER");
 
-    for(i = 0; i < NUM_DIR_QS; i++)
-        dma_free_coherent(&gpd_dev->pdev->dev, PAGE_SIZE, q_heads[i].base, q_heads[i].dma_base);
-    GPD_LOG("Released DMA coherent");
+    // for(i = 0; i < NUM_DIR_QS; i++)
+    //     dma_free_coherent(&gpd_dev->pdev->dev, PAGE_SIZE, q_heads[i].base, q_heads[i].dma_base);
+    // GPD_LOG("Released DMA coherent");
 
     pci_release_regions(pdev);
     GPD_LOG("Released MMIO/IOP regions");
