@@ -19,6 +19,6 @@ extern struct q_head q_heads[NUM_DIR_QS];
 
 int alloc_queue_mem(void);
 void destory_queue_mem(void);
-int get_queue_head(long* arg);
+int get_queue_head(unsigned long arg);
 
 #endif

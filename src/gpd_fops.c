@@ -1,8 +1,5 @@
 #include "gpd_fops.h"
 
-long qid;
-unsigned long q_addr;
-
 int gpd_open(struct inode *i, struct file *f) {
 	GPD_LOG("Device file opened");
 	return 0;
@@ -38,22 +35,7 @@ int gpd_open(struct inode *i, struct file *f) {
             destory_queue_mem();
 			break;
 	    case GET_Q_HEAD:
-		    if (copy_from_user(&qid, (long*) arg, sizeof(qid))) {
-		        GPD_ERR("Failed to get QID");
-		        return 1; // TODO: change return code
-		    }
-
-		    if (qid < q_size){
-				q_addr = q_heads[qid].dma_base;
-		        if (copy_to_user((long*) arg, &q_addr, sizeof(q_addr)))
-		            GPD_ERR("Failed to send queue head pointer");
-		        else {
-		            printk(KERN_NOTICE "GPD: Queue head pointer for QID %ld is 0x%lx\n", qid, q_addr);
-				}
-		    } else {
-		        printk(KERN_ERR "GPD: Invalid QID %ld. QID must be less than %d\n", qid, q_size);
-		        return 1; // TODO: change return code
-		    }
+			get_queue_head(arg);
 			break;
     }
 	return 0;
