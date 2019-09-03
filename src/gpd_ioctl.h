@@ -16,6 +16,7 @@ struct q_head {
 extern dma_addr_t dma_base;
 extern int q_size;
 extern struct q_head q_heads[NUM_DIR_QS];
+extern struct q_head pc_head;
 
 int alloc_queue_mem(void);
 void destory_queue_mem(void);

@@ -10,6 +10,26 @@
 #define DESTROY_Q_MEM   _IO('g', 'c')
 #define GET_Q_HEAD      _IOWR('g', 'd', long*)
 
+/**
+ * User program for testing DMA allocations through IOCTL calls
+ *
+ * @param  argc Number of input args (must be 3 if not default values assigned)
+ * @param  argv 1st: ./dma_alloc
+ *              2nd: number of queues(if argv[2] = 1) or qid (if argv[2] = 0)
+ *              3rd: set 1 to allocate queue mem
+ *                   set 0 to get head of qid
+ * @return 0 if successful
+ *
+ * Examples:
+ *   To allocate memory for 8 queues do:
+ *      $ ./dma_alloc 8 1
+ *   To get queue head qid 6 do:
+ *      $ ./dma_alloc 6 0
+ *   To get pop counter head, send qsize in qid, i.e.:
+ *      $ ./dma_alloc 8 0
+ *   To deallocate mem, send 0 while allocation:
+ *      $ ./dma_alloc 0 1
+ */
 int main(int argc, char *argv[]) {
 
     int fd, i, allocate;
@@ -22,7 +42,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    if (argc == 3)  {
+    if (argc == 3) {
         size = strtol(argv[1], &ptr, 10);
         allocate = strtol(argv[2], &ptr, 10);
     } else {
