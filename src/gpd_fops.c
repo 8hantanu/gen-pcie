@@ -1,12 +1,17 @@
 #include "gpd_fops.h"
 
-ssize_t gpd_write(struct file *f, const char __user *buf, size_t len, loff_t *offset) {
-	struct gpd_dev *dev;
-
-	dev = container_of(f->f_inode->i_cdev, struct gpd_dev, cdev);
-
+int gpd_open(struct inode *i, struct file *f) {
+	GPD_LOG("Device file opened");
 	return 0;
 }
+
+// ssize_t gpd_write(struct file *f, const char __user *buf, size_t len, loff_t *offset) {
+// 	struct gpd_dev *dev;
+//
+// 	dev = container_of(f->f_inode->i_cdev, struct gpd_dev, cdev);
+//
+// 	return 0;
+// }
 
 #if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
   long gpd_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
@@ -30,7 +35,7 @@ ssize_t gpd_write(struct file *f, const char __user *buf, size_t len, loff_t *of
             destory_queue_mem();
 			break;
 	    case GET_Q_HEAD:
-		    get_queue_head(&arg);
+			get_queue_head(arg);
 			break;
     }
 	return 0;

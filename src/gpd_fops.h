@@ -23,7 +23,7 @@ struct gpd_dev {
 	struct device *gpd_device;
 };
 
-//int gpd_open(struct inode *i, struct file *f);
+int gpd_open(struct inode *i, struct file *f);
 //int gpd_close(struct inode *i, struct file *f);
 //ssize_t gpd_read(struct file *f, char __user *buf, size_t len, loff_t *offset);
 // ssize_t gpd_write(struct file *f, const char __user *buf, size_t len, loff_t *offset);

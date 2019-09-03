@@ -20,6 +20,6 @@
 #define GPD_LOG(string...) printk(KERN_NOTICE "GPD: %s\n", string)
 #define GPD_ERR(string...) printk(KERN_ERR "GPD: %s\n", string)
 
-static const char gpd_name[] = "GPD";
+static const char gpd_name[] = "gpd";
 
 #endif
