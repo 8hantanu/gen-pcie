@@ -10,7 +10,7 @@
 #define DESTROY_Q_MEM   _IO('g', 'c')
 #define GET_Q_HEAD      _IOWR('g', 'd', long*)
 
-unsigned long main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 
     int fd, i, allocate;
     unsigned long qid_addr[128], size;
@@ -42,11 +42,11 @@ unsigned long main(int argc, char *argv[]) {
             printf("Allocating queue memory\n");
             ioctl(fd, ALLOC_Q_MEM);
 
-            for(i = 0; i < size; i++) {
-                qid_addr[i] = i;
-                ioctl(fd, GET_Q_HEAD, (long*) &qid_addr[i]);
-                printf("QID %d head pointer: 0x%lx\n", i, qid_addr[i]);
-            }
+            // for(i = 0; i < size; i++) {
+            //     qid_addr[i] = i;
+            //     ioctl(fd, GET_Q_HEAD, (long*) &qid_addr[i]);
+            //     printf("QID %d head pointer: 0x%lx\n", i, qid_addr[i]);
+            // }
 
         } else {
 
@@ -56,13 +56,11 @@ unsigned long main(int argc, char *argv[]) {
         }
 
     } else {
-        printf("QID %d pointer:\n", size);
         ioctl(fd, GET_Q_HEAD, (long*) &size);
-        printf("0x%lx\n", size);
+        printf("0x%lx", size);
     }
 
-    printf("Closing driver\n");
     close(fd);
 
-    return size;
+    return 0;
 }
