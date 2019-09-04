@@ -12,9 +12,9 @@ struct pci_device_id pci_dev_id_gpd[] = {
 struct pci_driver gen_pcie_driv = {
     .name = (char *) gpd_name,
     .id_table = pci_dev_id_gpd,
-    .probe = device_probe,
-	.sriov_configure = device_sriov_configure,
-    .remove = device_remove
+    .probe = dev_probe,
+	.sriov_configure = dev_sriov_configure,
+    .remove = dev_remove
 };
 
 static int __init gpd_init_module(void) {

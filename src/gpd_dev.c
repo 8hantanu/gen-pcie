@@ -22,7 +22,7 @@ struct file_operations gpd_fops = {
 dev_t gpd_dev_num;
 struct class *dev_class;
 
-int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
+int dev_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
     struct gpd_dev *gpd_dev;
     gpd_dev = devm_kcalloc(&pdev->dev, 1, sizeof(struct gpd_dev), GFP_KERNEL);
@@ -33,26 +33,26 @@ int device_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
     gpd_dev->pdev = pdev;
 
-    if (pcie_device_reset(pdev, true))
+    if (dev_function_reset(pdev, true))
         GPD_ERR("Function reset failed");
     else
         GPD_LOG("Device Reset");
 
-    device_init(gpd_dev, pdev);
+    dev_init(gpd_dev, pdev);
 
     return 0;
 }
 
 
-int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
+int dev_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
 
     if (pci_enable_device(pdev) != 0 )
         GPD_ERR("Failed while enabling");
 
     // VFs
-    // device_sriov_configure(pdev, 2);
+    // dev_sriov_configure(pdev, 2);
 
-    // Request regions addressed by the BARs
+    // Reserve access to pdev by gpd
     if (pci_request_regions(pdev, gpd_name))
         GPD_ERR("MMIO/IOP map failed");
     else
@@ -87,22 +87,22 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     // pci_alloc_irq_vectors(pdev, 9, 9, PCI_IRQ_MSIX);
 
     // UEMsk
-    pcie_mask_uerr(pdev);
+    dev_mask_uerr(pdev);
 
     // BAR iomap
-    device_map_bar_space(gpd_dev, pdev);
+    dev_map_bar_space(gpd_dev, pdev);
 
     // Add cdev
-    device_cdev_add(gpd_dev, gpd_dev_num, &gpd_fops);
+    dev_add_cdev(gpd_dev, gpd_dev_num, &gpd_fops);
 
     // Create cdev
-    device_pf_create(gpd_dev, pdev, dev_class);
+    dev_pf_create(gpd_dev, pdev, dev_class);
 
     // Set device power state to D3
     // pci_set_power_state(pdev, PCI_D3hot);
 
     // Allocate DMA coherent
-    // device_alloc_dma_coherent(gpd_dev);
+    // dev_alloc_dma_coherent(gpd_dev);
 
     // Cleans up uncorrectable error status registers
     pci_cleanup_aer_uncorrect_error_status(pdev);
@@ -111,7 +111,7 @@ int device_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
 }
 
 
-int device_map_bar_space(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
+int dev_map_bar_space(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
 
     gpd_dev->hw.csr_kva = pci_iomap(pdev, 0, 0);
     gpd_dev->hw.csr_phys_addr = pci_resource_start(pdev, 0);
@@ -138,7 +138,7 @@ int device_map_bar_space(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
 }
 
 
-int device_cdev_add(struct gpd_dev *gpd_dev,
+int dev_add_cdev(struct gpd_dev *gpd_dev,
             dev_t base,
             const struct file_operations *fops)
 {
@@ -162,7 +162,7 @@ int device_cdev_add(struct gpd_dev *gpd_dev,
 }
 
 
-int device_pf_create(struct gpd_dev *gpd_dev,
+int dev_pf_create(struct gpd_dev *gpd_dev,
              struct pci_dev *pdev,
              struct class *dev_class)
 {
@@ -181,7 +181,45 @@ int device_pf_create(struct gpd_dev *gpd_dev,
 }
 
 
-// int device_alloc_dma_coherent(struct gpd_dev *gpd_dev){
+void dev_mask_uerr(struct pci_dev *pdev) {
+
+    u32 mask;
+    int pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ERR);
+
+    pci_read_config_dword(pdev, pos + PCI_ERR_UNCOR_MASK, &mask);
+    mask |= PCI_ERR_UNC_UNSUP;
+    pci_write_config_dword(pdev, pos + PCI_ERR_UNCOR_MASK, mask);
+}
+
+
+int dev_function_reset(struct pci_dev *pdev, bool save_state) {
+
+    int ret;
+
+    /* TODO: When upstreaming this, replace this function with
+     * pci_reset_function_locked() (available in newer kernels).
+     */
+
+    if (save_state) {
+        ret = pci_save_state(pdev);
+        if (ret)
+            return ret;
+    }
+
+    // NOTE: Can use pci_reset_function_locked(pdev) instead in new kernels
+    // TODO: Check kernel version
+    ret = __pci_reset_function_locked(pdev);
+    if (ret)
+        return ret;
+
+    if (save_state)
+        pci_restore_state(pdev);
+
+    return 0;
+}
+
+
+// int dev_alloc_dma_coherent(struct gpd_dev *gpd_dev){
 //
 //     for (i = 0; i < NUM_DIR_QS; i++) {
 //
@@ -213,15 +251,15 @@ int device_pf_create(struct gpd_dev *gpd_dev,
 // }
 
 
-int device_sriov_configure(struct pci_dev *pdev, int num_vfs) {
+int dev_sriov_configure(struct pci_dev *pdev, int num_vfs) {
     if (num_vfs)
-        return device_sriov_enable(pdev, num_vfs);
+        return dev_sriov_enable(pdev, num_vfs);
     else
-        return device_sriov_disable(pdev, num_vfs);
+        return dev_sriov_disable(pdev, num_vfs);
 }
 
 
-void device_remove(struct pci_dev *pdev) {
+void dev_remove(struct pci_dev *pdev) {
 
     struct gpd_dev *gpd_dev;
     gpd_dev = pci_get_drvdata(pdev);
