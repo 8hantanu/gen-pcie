@@ -17,8 +17,9 @@ for (my $i=0; $i<$qsize; $i++) {
     printf("0x%X\n", $qheads[i]);
 }
 
+# send qsize in qid arg to get pop counter pointer
 print "Pop counter pointer:\n";
-$addr = `$GPD_ROOT/test/dma_alloc $qsize 0`; # send qsize in qid arg to get pop counter pointer
+$addr = `$GPD_ROOT/test/dma_alloc $qsize 0`;
 $pchead = hex($addr);
 printf("0x%X\n", $pchead);
 

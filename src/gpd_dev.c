@@ -1,5 +1,4 @@
 #include "gpd_dev.h"
-#include "gpd_sys.h"
 #include "gpd_sriov.h"
 
 struct pci_dev *pci_dev;
@@ -38,45 +37,45 @@ int dev_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
     else
         GPD_LOG("Device Reset");
 
-    dev_init(gpd_dev, pdev);
+    dev_init(gpd_dev);
 
     return 0;
 }
 
 
-int dev_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
+int dev_init(struct gpd_dev *gpd_dev) {
 
-    if (pci_enable_device(pdev) != 0 )
+    if (pci_enable_device(gpd_dev->pdev) != 0 )
         GPD_ERR("Failed while enabling");
 
     // VFs
-    // dev_sriov_configure(pdev, 2);
+    // dev_sriov_configure(gpd_dev->pdev, 2);
 
     // Reserve access to pdev by gpd
-    if (pci_request_regions(pdev, gpd_name))
+    if (pci_request_regions(gpd_dev->pdev, gpd_name))
         GPD_ERR("MMIO/IOP map failed");
     else
         GPD_LOG("Mapped MMIO/IOP regions");
 
     // Enable bus mastering
-    pci_set_master(pdev);
+    pci_set_master(gpd_dev->pdev);
     GPD_LOG("Enabled bus mastering");
 
     // Enable PCI INTx
-    pci_intx(pdev, 0);
+    pci_intx(gpd_dev->pdev, 0);
 
     // Enable AER capability
-    if (pci_enable_pcie_error_reporting(pdev))
+    if (pci_enable_pcie_error_reporting(gpd_dev->pdev))
         GPD_ERR("AER enable failed");
     else
         GPD_LOG("Enabled AER");
 
     // Set DMA Mask
-    dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+    dma_set_mask_and_coherent(&gpd_dev->pdev->dev, DMA_BIT_MASK(64));
 
     // Enable interrupt vectors
-    // int vecs_available = pci_msix_vec_count(pdev);
-    // int vecs_assigned = pci_enable_msix_range(pdev, entries, 1, vecs_available);
+    // int vecs_available = pci_msix_vec_count(gpd_dev->pdev);
+    // int vecs_assigned = pci_enable_msix_range(gpd_dev->pdev, entries, 1, vecs_available);
     // if (vecs_available != vecs_assigned)
     //     GPD_ERR("MSI-X vectors enable failed");
     // else
@@ -84,54 +83,54 @@ int dev_init(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
     // printk(KERN_NOTICE "GPD: Total %d MSI vecs available", vecs_available);
     // printk(KERN_NOTICE "GPD: Total %d MSI vecs assigned", vecs_assigned);
     //
-    // pci_alloc_irq_vectors(pdev, 9, 9, PCI_IRQ_MSIX);
+    // pci_alloc_irq_vectors(gpd_dev->pdev, 9, 9, PCI_IRQ_MSIX);
 
     // UEMsk
-    dev_mask_uerr(pdev);
+    dev_mask_uerr(gpd_dev->pdev);
 
     // BAR iomap
-    dev_map_bar_space(gpd_dev, pdev);
+    dev_map_bar_space(gpd_dev);
 
     // Add cdev
     dev_add_cdev(gpd_dev, gpd_dev_num, &gpd_fops);
 
     // Create cdev
-    dev_pf_create(gpd_dev, pdev, dev_class);
+    dev_pf_create(gpd_dev, dev_class);
 
     // Set device power state to D3
-    // pci_set_power_state(pdev, PCI_D3hot);
+    // pci_set_power_state(gpd_dev->pdev, PCI_D3hot);
 
     // Allocate DMA coherent
     // dev_alloc_dma_coherent(gpd_dev);
 
     // Cleans up uncorrectable error status registers
-    pci_cleanup_aer_uncorrect_error_status(pdev);
+    pci_cleanup_aer_uncorrect_error_status(gpd_dev->pdev);
 
     return 0;
 }
 
 
-int dev_map_bar_space(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
+int dev_map_bar_space(struct gpd_dev *gpd_dev) {
 
-    gpd_dev->hw.csr_kva = pci_iomap(pdev, 0, 0);
-    gpd_dev->hw.csr_phys_addr = pci_resource_start(pdev, 0);
+    gpd_dev->hw.csr_kva = pci_iomap(gpd_dev->pdev, 0, 0);
+    gpd_dev->hw.csr_phys_addr = pci_resource_start(gpd_dev->pdev, 0);
     if (!gpd_dev->hw.csr_kva) {
         GPD_ERR("Failed to map BAR 0");
         // TODO: Add fail flow
     } else {
         GPD_LOG("Mapped BAR 0 space");
-        printk(KERN_NOTICE "GPD: BAR 0 start at 0x%llx\n", pci_resource_start(pdev, 0));
-        printk(KERN_NOTICE "GPD: BAR 0 len is %llu\n", pci_resource_len(pdev, 0));
+        printk(KERN_NOTICE "GPD: BAR 0 start at 0x%llx\n", pci_resource_start(gpd_dev->pdev, 0));
+        printk(KERN_NOTICE "GPD: BAR 0 len is %llu\n", pci_resource_len(gpd_dev->pdev, 0));
     }
-    gpd_dev->hw.func_kva = pci_iomap(pdev, 2, 0);
-    gpd_dev->hw.func_phys_addr = pci_resource_start(pdev, 2);
+    gpd_dev->hw.func_kva = pci_iomap(gpd_dev->pdev, 2, 0);
+    gpd_dev->hw.func_phys_addr = pci_resource_start(gpd_dev->pdev, 2);
     if (!gpd_dev->hw.func_kva) {
         GPD_ERR("Failed to map BAR 2");
         // TODO: Add fail flow
     } else {
         GPD_LOG("Mapped BAR 2 space");
-        printk(KERN_NOTICE "GPD: BAR 2 start at 0x%llx\n", pci_resource_start(pdev, 2));
-        printk(KERN_NOTICE "GPD: BAR 2 len is %llu\n", pci_resource_len(pdev, 2));
+        printk(KERN_NOTICE "GPD: BAR 2 start at 0x%llx\n", pci_resource_start(gpd_dev->pdev, 2));
+        printk(KERN_NOTICE "GPD: BAR 2 len is %llu\n", pci_resource_len(gpd_dev->pdev, 2));
     }
 
     return 0;
@@ -139,8 +138,8 @@ int dev_map_bar_space(struct gpd_dev *gpd_dev, struct pci_dev *pdev) {
 
 
 int dev_add_cdev(struct gpd_dev *gpd_dev,
-            dev_t base,
-            const struct file_operations *fops)
+                 dev_t base,
+                 const struct file_operations *fops)
 {
     int ret;
 
@@ -163,8 +162,7 @@ int dev_add_cdev(struct gpd_dev *gpd_dev,
 
 
 int dev_pf_create(struct gpd_dev *gpd_dev,
-             struct pci_dev *pdev,
-             struct class *dev_class)
+                  struct class *dev_class)
 {
     dev_t dev;
 
@@ -173,9 +171,7 @@ int dev_pf_create(struct gpd_dev *gpd_dev,
     /* Create a new device in order to create a /dev/ gpd node. This device
      * is a child of the PCI device.
      */
-    gpd_dev->gpd_device = device_create(dev_class, &pdev->dev,
-                                        dev, gpd_dev,
-                                        "gpd");
+    gpd_dev->gpd_device = device_create(dev_class, &gpd_dev->pdev->dev, dev, gpd_dev, "gpd");
 
     return 0;
 }
@@ -219,6 +215,7 @@ int dev_function_reset(struct pci_dev *pdev, bool save_state) {
 }
 
 
+// NOTE: Allocation now done during runtime through IOCTL calls
 // int dev_alloc_dma_coherent(struct gpd_dev *gpd_dev){
 //
 //     for (i = 0; i < NUM_DIR_QS; i++) {

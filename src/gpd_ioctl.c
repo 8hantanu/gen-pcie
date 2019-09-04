@@ -11,7 +11,6 @@ int alloc_queue_mem(void) {
 
     for (i = 0; i < q_size; i++) {
         dma_base = 0;
-        // dma alloc limit seems to be 4MB
         q_heads[i].base = dma_alloc_coherent(NULL, PAGE_SIZE, &dma_base, GFP_KERNEL);
         q_heads[i].dma_base = dma_base;
 

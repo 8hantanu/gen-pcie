@@ -1,9 +1,5 @@
 #include "gpd_dev.h"
 
-unsigned long mmio_addr;
-unsigned long reg_len;
-unsigned long *base_addr;
-
 struct pci_device_id pci_dev_id_gpd[] = {
     {VENDOR_ID, DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
     {}

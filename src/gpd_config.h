@@ -3,6 +3,7 @@
 
 #define VENDOR_ID                   0x8086
 #define DEVICE_ID                   0x270b
+
 #define MAX_NUM_VFS                 16
 #define MAX_NUM_DOMAINS             32
 

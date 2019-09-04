@@ -24,10 +24,10 @@ struct gpd_dev {
 };
 
 int gpd_open(struct inode *i, struct file *f);
-//int gpd_close(struct inode *i, struct file *f);
-//ssize_t gpd_read(struct file *f, char __user *buf, size_t len, loff_t *offset);
+// int gpd_close(struct inode *i, struct file *f);
+// ssize_t gpd_read(struct file *f, char __user *buf, size_t len, loff_t *offset);
 // ssize_t gpd_write(struct file *f, const char __user *buf, size_t len, loff_t *offset);
-//int gpd_mmap(struct file *f, struct vm_area_struct *vma);
+// int gpd_mmap(struct file *f, struct vm_area_struct *vma);
 
 #if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
   long gpd_ioctl(struct file *f, unsigned int cmd, unsigned long arg);
