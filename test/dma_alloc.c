@@ -20,15 +20,22 @@
  *
  * @return 0 if successful
  *
- * @details Usage examples
- *          To allocate memory for 8 queues do:
- *              $ ./dma_alloc 8 1
- *          To get queue head qid 6 do:
- *              $ ./dma_alloc 6 0
- *          To get pop counter head, send qsize in qid, i.e.:
- *              $ ./dma_alloc 8 0
- *          To deallocate mem, send 0 while allocation:
- *              $ ./dma_alloc 0 1
+ * @details Usage:
+ *             To allocate memory for n queues do:
+ *                 $ ./dma_alloc <n> 1
+ *             To deallocate memory, send 0 while allocation:
+ *                 $ ./dma_alloc 0 1
+ *             To get queue head qid i do:
+ *                 $ ./dma_alloc <i> 0
+ *             To get pop counter head, send qsize in qid:
+ *                 $ ./dma_alloc <qsize> 0
+ *          Examples:
+ *             To allocate memory for 8 queues do:
+ *                 $ ./dma_alloc 8 1
+ *             To get queue head qid 6 do:
+ *                 $ ./dma_alloc 6 0
+ *             To get pop counter head, send qsize in qid:
+ *                 $ ./dma_alloc 8 0
  */
 int main(int argc, char *argv[]) {
 
