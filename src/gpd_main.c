@@ -1,10 +1,12 @@
 #include "gpd_dev.h"
 
+// PCI device IDs which are to be probed
 struct pci_device_id pci_dev_id_gpd[] = {
     {VENDOR_ID, DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
     {}
 };
 
+// PCI driver struct
 struct pci_driver gen_pcie_driv = {
     .name = (char *) gpd_name,
     .id_table = pci_dev_id_gpd,
@@ -20,7 +22,7 @@ static int __init gpd_init_module(void) {
     // Allocate one minor number per domain
 	err = alloc_chrdev_region(&gpd_dev_num, 0, MAX_NUM_DEV_FILES, gpd_name);
 
-    // cdev class
+    // Create cdev class
 	dev_class = class_create(THIS_MODULE, "dev_class");
 
     // Calls the probe function of gen_pcie_driv and registers all devices(pf and vf)
@@ -30,7 +32,7 @@ static int __init gpd_init_module(void) {
 }
 
 static void __exit gpd_exit_module(void) {
-    // Calls the remove function on gen_pcie_driv
+    // Calls the remove function in gen_pcie_driv
     pci_unregister_driver(&gen_pcie_driv);
 }
 
