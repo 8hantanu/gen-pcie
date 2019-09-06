@@ -115,6 +115,7 @@ GPD_VF_SYSFS_ATTR_GROUP(13);
 GPD_VF_SYSFS_ATTR_GROUP(14);
 GPD_VF_SYSFS_ATTR_GROUP(15);
 
+
 const struct attribute_group *gpd_vf_attrs[] = {
 	&gpd_vf0_attr_group,
     &gpd_vf1_attr_group,
@@ -135,7 +136,7 @@ const struct attribute_group *gpd_vf_attrs[] = {
 };
 
 
-int device_sriov_enable(struct pci_dev *pdev, int num_vfs) {
+int dev_sriov_enable(struct pci_dev *pdev, int num_vfs) {
 
     int ret, i;
 
@@ -159,14 +160,14 @@ int device_sriov_enable(struct pci_dev *pdev, int num_vfs) {
     return num_vfs;
 }
 
-int device_sriov_disable(struct pci_dev *pdev, int num_vfs) {
+
+int dev_sriov_disable(struct pci_dev *pdev, int num_vfs) {
 
     int i;
 
-    for (i = 0; i < pci_num_vf(pdev); i++) {
-        /* Remove sysfs files for the VFs */
+    for (i = 0; i < pci_num_vf(pdev); i++)
         sysfs_remove_group(&pdev->dev.kobj, gpd_vf_attrs[i]);
-    }
+
     pci_disable_sriov(pdev);
 
     return 0;

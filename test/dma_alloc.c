@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -17,18 +16,26 @@
  * @param  argv 1st: ./dma_alloc
  *              2nd: number of queues(if argv[2] = 1) or qid (if argv[2] = 0)
  *              3rd: set 1 to allocate queue mem
- *                   set 0 to get head of qid
+ *                   set 0 to get head of qid or pc
+ *
  * @return 0 if successful
  *
- * Examples:
- *   To allocate memory for 8 queues do:
- *      $ ./dma_alloc 8 1
- *   To get queue head qid 6 do:
- *      $ ./dma_alloc 6 0
- *   To get pop counter head, send qsize in qid, i.e.:
- *      $ ./dma_alloc 8 0
- *   To deallocate mem, send 0 while allocation:
- *      $ ./dma_alloc 0 1
+ * @details Usage:
+ *             To allocate memory for n queues do:
+ *                 $ ./dma_alloc <n> 1
+ *             To deallocate memory, send 0 while allocation:
+ *                 $ ./dma_alloc 0 1
+ *             To get queue head qid i do:
+ *                 $ ./dma_alloc <i> 0
+ *             To get pop counter head, send qsize in qid:
+ *                 $ ./dma_alloc <qsize> 0
+ *          Examples:
+ *             To allocate memory for 8 queues do:
+ *                 $ ./dma_alloc 8 1
+ *             To get queue head qid 6 do:
+ *                 $ ./dma_alloc 6 0
+ *             To get pop counter head, send qsize in qid:
+ *                 $ ./dma_alloc 8 0
  */
 int main(int argc, char *argv[]) {
 
@@ -54,7 +61,7 @@ int main(int argc, char *argv[]) {
 
         if (size) {
 
-            printf("Number of queues set to %d\n", size);
+            printf("Number of queues set to %lx\n", size);
 
             printf("Sending queue size to GPD\n");
             ioctl(fd, SET_Q_SIZE, (int*) &size);

@@ -14,12 +14,13 @@
 #include <linux/uaccess.h>
 // #include <linux/ioctl.h>
 
-// TODO: Replace ret with errcodes from <linux/errno.h>
+// TODO: Replace return ints with errcodes from <linux/errno.h>
 #include "gpd_config.h"
 
 #define GPD_LOG(string...) printk(KERN_NOTICE "GPD: %s\n", string)
 #define GPD_ERR(string...) printk(KERN_ERR "GPD: %s\n", string)
 
+// Reflected in /sys/module/<module_name>/drivers/pci:<driver_name>
 static const char gpd_name[] = "gpd";
 
 #endif
