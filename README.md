@@ -2,6 +2,7 @@
 
 The GPD(generic PCIe driver) enables all the basic capabilities of any PCIe supported device.
 
+
 ## Prereqs
 
 Make sure the kernel sources are same while building and testing.
@@ -9,8 +10,6 @@ Make sure the kernel sources are same while building and testing.
 ```bash
 $ export KSRC=/tools/AGRtools/fedora24/4.8.6-201.frio.fc24.x86_64
 ```
-
-**Note:** The following code has been tested on `8086:270b` device on the `FRIO-071B`system using `/tools/AGRtools/fedora24/4.8.6-201.frio.fc24.x86_64` as the kernel source.
 
 
 ## Build
@@ -30,8 +29,6 @@ To load the GPD driver do:
 $ insmod gpd.ko
 ```
 
-**Note:** If testing HQM using GPD, rename driver to _gpd_ to _hqm_. Refer **Changing driver name** section in _gen-pcie.wiki/Build.md_. 
-
 ## Debug
 
 To view device capabilities and status do:
@@ -39,8 +36,6 @@ To view device capabilities and status do:
 ```bash
 $ lspci -d [VENDOR_ID:DEVICE_ID] -vvv
 ```
-
-**Note**: In our case VENDOR_ID is 8086, DEVICE_ID is 270b
 
 To view kernel logs specific to GPD do:
 
